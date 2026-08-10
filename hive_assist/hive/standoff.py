@@ -238,6 +238,36 @@ class DubinsPath:
         return np.array([self.sample(g)[0] for g in np.linspace(0, 1, n)])
 
 
+def walk_waypoints(paths, step_m: float) -> np.ndarray:
+    """Resample Dubins paths into one (K, A, 2) ladder of gated waypoints.
+
+    D3's `follow()` flies a path with its own integrator at `v_cruise`. The live
+    loop cannot: it emits position setpoints at `plan_hz` and the supervisor
+    rejects any tick that moves further than `StreamLimits.v_max`. So the curve
+    has to be handed over as a SEQUENCE of goals, each within one tick's budget,
+    rather than as a single distant goal — which is what makes the flown ground
+    track an arc instead of the straight line a lone endpoint would produce.
+
+    Every path is resampled to the SAME K. `sample()` is arc-length
+    parameterised, so uniform gamma is uniform distance and K is chosen from the
+    longest path; a shorter path simply takes smaller steps. Equal K is what
+    keeps the coalition in lockstep — `step_toward` only advances a leg once
+    EVERY vehicle has arrived, so unequal ladders would make the shorter path
+    idle at its last rung waiting for the longer one.
+    """
+    if step_m <= 0:
+        raise ValueError(f"step_m must be positive, got {step_m}")
+    paths = list(paths)
+    if not paths:
+        raise ValueError("walk_waypoints needs at least one path")
+    longest = max(p.length for p in paths)
+    k = max(int(np.ceil(longest / step_m)) + 1, 2)
+    gammas = np.linspace(0.0, 1.0, k)
+    # (A, K, 2) -> (K, A, 2): the loop indexes by rung, not by agent.
+    per_agent = np.array([[p.sample(g)[0] for g in gammas] for p in paths])
+    return np.swapaxes(per_agent, 0, 1)
+
+
 def dubins(start, end, radius: float, tol: float = 1e-6) -> DubinsPath:
     """Shortest curvature-bounded path between two poses.
 

@@ -1,14 +1,26 @@
 # Virtual environments
 .venv/
 .venv-sim/
+venv/
+env/
 
 # Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+*.egg-info/
+build/
+dist/
 
-# VS Code
+# Editors / IDEs
 .vscode/
+.idea/
+*.swp
 
 # Temporary files
 tempCodeRunnerFile.py
@@ -25,6 +37,9 @@ brain/ros2_ws/log/
 brain/ros2_ws/src/ros2_rust/
 hive_assist/rust/target/
 
+# SITL logs from sim/run_fleet.sh
+hive_assist/sim/logs/
+
 # Brain: Layer 2 generated dataset (1440 rendered camera frames + detector + bearings)
 brain/frames/
 brain/detector.onnx
@@ -33,6 +48,26 @@ brain/layer1_*.csv
 
 # macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+.fseventsd
+.DocumentRevisions-V100
+.TemporaryItems
+# AppleDouble resource-fork sidecars, created when a macOS tree is copied to a
+# non-HFS volume (USB stick, zip, this Windows checkout). Junk on every platform.
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
 
 # Simulator
 brain/gym-pybullet-drones/
@@ -56,3 +91,6 @@ brain/python_sender_latencies.csv
 # that document a milestone are force-added per-file in the commit that adds them.
 hive_assist/figures/*.gif
 hive_assist/runs/
+
+# Claude Code local session config (not part of the stack)
+.claude/

@@ -1,4 +1,4 @@
-# Sixteen things that went wrong, and what each one taught us
+# Twenty things that went wrong, and what each one taught us
 
 Every bug found while building `hive_assist`, in the order it surfaced, explained
 in plain language.
@@ -15,10 +15,11 @@ wrong.
 
 | | |
 |---|---|
-| bugs found and fixed | **16** |
+| bugs found and fixed | **20** |
 | domains | **4** |
 | were wrong beliefs, not wrong code | **6** |
-| tests now holding them down | **218** |
+| produced a run that looked completely fine | **9** |
+| tests now holding them down | **261** |
 
 ---
 
@@ -434,13 +435,104 @@ only have discovered it mid-experiment, on the other laptop.
 line, and added a plain group comparison beside it. Rewrote the embedded snippet in
 a language that doesn't need the nested quotes at all.
 
-*→ `tests/test_safe_hold.py::test_lunge_magnitude_grows_with_loss`, `sim/netem_sweep.sh`*
+*→ `tests/test_safe_hold.py::test_lunge_magnitude_grows_with_loss`*
 
 ---
 
-## What all sixteen have in common
+## Domain 4, second pass — flying it for real
 
-Only two of these were ordinary broken code. The rest fall into three groups, and
+The vision front end was deleted on 2026-08-08 and Domain 4 was rebuilt around a
+real autopilot: one drone, no GPS, no camera, positioned entirely by distances.
+These four surfaced while getting that to fly, and every one of them produced a
+run that looked completely fine.
+
+### Bug 17 — The simulator's own truth, rounded to nothing
+
+**What broke.** Nothing, visibly. The drone reported where it really was, we
+generated distances from that, the estimator did its job. It just would have been
+quietly ~18 cm wrong forever.
+
+The simulator publishes its true position in two different messages. One stores
+the number as a whole number of ten-millionths of a degree — exact, about a
+centimetre. The other stores *the same huge number* in a format that only keeps
+about seven significant digits, and the number needs nine. So the last couple of
+digits are guesses.
+
+> **Think of it like this.** Reading a bank balance off a display that can only
+> show seven digits. £1,234,567.89 comes back as £1,234,568 — perfectly
+> reasonable-looking, and no longer the actual number.
+
+Twelve times the noise of the distance sensors we were simulating. Ground truth
+would have been the biggest error in the whole system, and every result would
+have been measured against it.
+
+**The fix.** Read the exact message, refuse the lossy one outright, and have the
+system announce which one it actually used every time it starts.
+
+*→ `sim/ground_truth_bridge.py`, `tests/test_domain4_loop.py::test_sim_state_uses_the_integer_extensions_only`*
+
+### Bug 18 — A filter that matched nothing, silently
+
+**What broke.** A healthy radio link, the true-position messages plainly arriving
+twenty times a second, and the software insisting it had never received one.
+
+We asked the library for "either of these two message types" using round brackets
+where it wanted square ones. The library checks for square brackets, doesn't find
+them, and helpfully wraps what you gave it — so instead of asking for *A or B*, we
+asked for a single message type called *"A-and-B-together"*, which does not exist.
+
+> **Think of it like this.** Asking the post office to forward letters for "Smith
+> or Jones" and having them look for one person named "Smith or Jones".
+
+**The fix.** Square brackets, and a comment saying why it is not a matter of style.
+
+*→ `sim/ground_truth_bridge.py`, `TRUTH_SOURCES`*
+
+### Bug 19 — Two readers eating each other's mail
+
+**What broke.** The drone refused to arm, and the message explaining why never
+appeared. Just "nothing armed", with no reason.
+
+Two parts of the program were reading the same connection — one looking for
+position, one looking for status messages. The library **discards** anything that
+doesn't match what you asked for; it doesn't put it back. So whichever ran first
+threw away the other's messages. The refusal reason was received, and deleted,
+about fifty times a second.
+
+> **Think of it like this.** Two flatmates checking the same post box, each
+> binning anything not addressed to them.
+
+**The fix.** One reader, which sorts everything into pigeonholes that the rest of
+the program collects from. The moment that was in place, the drone told us exactly
+what it wanted — and then armed.
+
+*→ `sim/ground_truth_bridge.py::pump`, `sim/orchestrator.py::VehicleCommander`*
+
+### Bug 20 — A hole in the stream at the worst possible moment
+
+**What broke.** The position feed the autopilot depends on went quiet for 0.8
+seconds, exactly while the autopilot was deciding whether that feed was
+trustworthy enough to fly on.
+
+Startup does two things: begin streaming position, then tell the drone where in
+the world it is. The second step sends five messages with short pauses between
+them — and it was running *before* the background sender that keeps the stream
+alive had been started. So the pauses were silence.
+
+> **Think of it like this.** A pilot asking "are you still there?" during the one
+> gap in an otherwise continuous radio check.
+
+**The fix.** Start the sender first, then set the position. Worst gap went from
+820 ms to 60 ms, and the run now reports the worst gap it ever produced rather
+than claiming to be continuous.
+
+*→ `sim/external_nav_fanout.py::prime`*
+
+---
+
+## What all twenty have in common
+
+Only four of these were ordinary broken code. The rest fall into three groups, and
 the grouping is the real lesson.
 
 ### Wrong belief, right code — bugs 02, 03, 05, 10
@@ -448,12 +540,12 @@ the grouping is the real lesson.
 The code did exactly what it was told. What it was told was based on something we
 assumed and had never measured.
 
-### The measurement was lying — bugs 04, 11, 12, 16
+### The measurement was lying — bugs 04, 11, 12, 16, 17
 
 The system was fine; the ruler, the caption or the statistic was wrong. These are
 the worst kind — they send you fixing something that isn't broken.
 
-### Fine on its own, broken together — bugs 06, 07, 09, 13, 15
+### Fine on its own, broken together — bugs 06, 07, 09, 13, 15, 19, 20
 
 Every piece behaved correctly in isolation. The fault lived in the gap between two
 pieces that each assumed the other was handling it.

@@ -530,3 +530,88 @@ def plot_safe_hold(res) -> pathlib.Path:
         f"bounds its distance.",
         fontsize=9, color=INK_2, ha="left", va="bottom", linespacing=1.5)
     return _save(fig, "d4_safe_hold.png")
+
+
+# --------------------------------------------------------------------------
+# D4.9 — the standoff dispatch, FLOWN
+# --------------------------------------------------------------------------
+def plot_live_standoff(res: dict, task: str = "inspection") -> pathlib.Path:
+    """`d3_standoff_approach.png`'s claim, redrawn from a live SITL flight.
+
+    The offline D3 figure plots a trajectory produced by `follow()`'s own
+    integrator — a perfect vehicle on a perfect estimate. This one plots where
+    ArduCopter's airframe ACTUALLY went, measured against SIMSTATE truth, while
+    flying on a range-only GPS-denied estimate. The dashed perimeter is the
+    claim: every commanded rung and every metre flown stays on or outside it.
+    """
+    from hive.standoff import TASKS
+
+    x_tac = np.asarray(res["target"], dtype=float)
+    stations = [np.asarray(s, dtype=float) for s in res["stations"]]
+    coalition = list(res["coalition"])
+    d_s = TASKS[task].standoff_m
+
+    fig, ax = plt.subplots(figsize=(8.4, 7.4), facecolor=SURFACE)
+    _style(ax)
+    ax.set_aspect("equal")
+
+    peri = plt.Circle(tuple(x_tac), d_s, fill=False, ls="--", lw=1.2,
+                      color=INK_MUTED, zorder=1)
+    ax.add_patch(peri)
+    ang = np.deg2rad(60.0)
+    ax.text(x_tac[0] + d_s * np.cos(ang), x_tac[1] + d_s * np.sin(ang) + 0.8,
+            f"standoff perimeter  d_s = {d_s:.0f} m",
+            fontsize=9, color=INK_MUTED, ha="center")
+
+    # SERIES_3 is sub-3:1 on this surface, so it is only safe where the mark
+    # also carries a direct label — every station here is labelled by name.
+    colours = [SERIES_1, SERIES_2, SERIES_3, INK_2]
+    for k, agent in enumerate(coalition):
+        c = colours[k % len(colours)]
+        planned = np.asarray(res["planned"], dtype=float)[:, k, :]
+        ax.plot(planned[:, 0], planned[:, 1], lw=3.4, color=c, alpha=0.30,
+                solid_capstyle="round", zorder=2,
+                label=f"v{agent} commanded rungs" if k == 0 else None)
+        track = np.asarray(res["tracks"][str(agent)]
+                           if str(agent) in res["tracks"]
+                           else res["tracks"][agent], dtype=float)
+        ax.plot(track[:, 0], track[:, 1], lw=1.7, color=c, zorder=3,
+                label=f"v{agent} flown (truth)")
+        ax.plot(*track[0], "o", ms=6, color=c, zorder=4)
+        ax.plot(*stations[k], marker="*", ms=15, color=c, zorder=5,
+                markeredgecolor=SURFACE, markeredgewidth=0.8)
+        ax.annotate(f"v{agent} station", stations[k],
+                    textcoords="offset points", xytext=(10, -14),
+                    fontsize=9, color=c, fontweight="bold")
+
+    ax.plot(*x_tac, "X", ms=15, color=INK, zorder=6)
+    ax.annotate("X_tac (target)", x_tac, textcoords="offset points",
+                xytext=(12, 8), fontsize=10, color=INK, fontweight="bold")
+
+    closest = min(
+        np.linalg.norm(np.asarray(t, dtype=float) - x_tac, axis=1).min()
+        for t in res["tracks"].values())
+    final = res["station_error_m"][-1] if res["station_error_m"] else float("nan")
+
+    ax.set_xlabel("TacFrame x  [m]")
+    ax.set_ylabel("TacFrame y  [m]")
+    ax.grid(True, color=GRID, lw=0.7)
+    ax.set_axisbelow(True)
+    leg = ax.legend(loc="lower left", fontsize=9, frameon=False)
+    for t in leg.get_texts():
+        t.set_color(INK_2)
+
+    word = {1: "One drone", 2: "Two drones", 3: "Three drones",
+            4: "Four drones"}.get(len(coalition), f"{len(coalition)} drones")
+    fig.suptitle(f"{word} dispatched to a standoff perimeter — flown in SITL",
+                 x=0.02, ha="left", fontsize=15, fontweight="bold", color=INK)
+    fig.text(
+        0.02, 0.925,
+        f"CBBA elects the coalition {coalition}; each flies its own "
+        f"curvature-bounded approach to its own slot on the perimeter and holds "
+        f"it.\nClosest either airframe came to the target: "
+        f"{closest:.2f} m against a {d_s:.0f} m standoff. Final distance to "
+        f"station {final:.2f} m, measured against SIMSTATE truth.",
+        fontsize=9.5, color=INK_2, ha="left", va="top", linespacing=1.5)
+    fig.subplots_adjust(top=0.86)
+    return _save(fig, "d4_live_standoff.png")
