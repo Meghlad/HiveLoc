@@ -1,0 +1,19 @@
+{
+  "_comment": [
+    "Supervisor config for the 20-vehicle sim, in METRES in TacFrame.",
+    "Note this differs from the Brain's defaults, which are in normalised",
+    "estimator units (a 1x1 box, 8 cm spacing) because the Brain flew a",
+    "Crazyflie-scale dataset. Same struct, same gate, different site.",
+    "",
+    "max_cov_trace is the number Domain 1 is about. The anchored estimator",
+    "holds sigma around 6 cm/axis => trace ~0.007. A conventionally-pinned",
+    "estimator reports a comparable trace while being 1.16 m from truth, which",
+    "is exactly why this gate cannot be the only thing standing between a",
+    "drifting estimate and a commanded vehicle."
+  ],
+  "geofence": [[-40.0, -40.0], [40.0, -40.0], [40.0, 40.0], [-40.0, 40.0]],
+  "min_spacing_m": 1.2,
+  "max_cov_trace": 0.02,
+  "max_plan_age_ms": 5000,
+  "max_estimate_age_ms": 1000
+}

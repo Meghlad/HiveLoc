@@ -21,7 +21,7 @@
 services:
   swarm:
     build:
-      context: .                     # repo ROOT: the Rust workspace + Python layers
+      context: .                     # brain/ ROOT: the Rust workspace + Python layers
       dockerfile: ros2_ws/Dockerfile #   (matches the Dockerfile's COPY paths)
     image: coop-swarm-ros:latest     # tag the build so it is reused, not rebuilt
     container_name: coop-swarm-ros

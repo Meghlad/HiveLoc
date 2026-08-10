@@ -1,11 +1,14 @@
 # RUN
 
-> All commands run from the repo root with the venv active.
+> All commands run **from `brain/`** (this directory) with the venv active.
+> Every script below resolves `data/` and `figures/` relative to the working
+> directory, so `cd brain` first or nothing will be found.
 
 ## 1. Setup
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
+cd brain
+python3 -m venv ../.venv && source ../.venv/bin/activate
 pip install -r requirements.txt
 python src/tools/check.py
 ```

@@ -1,0 +1,10 @@
+[project]
+name = "hive-assist"
+version = "0.1.0"
+description = "Anchor-referenced cooperative swarm: coordinate-in-hand to gated setpoints"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
